@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b3d5c">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gemini Chat">
+<meta name="description" content="Trợ lý AI Gemini — trò chuyện, gửi ảnh/video/tệp, tuỳ chỉnh model.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Gemini Chat</title>
+<style>
+  :root{
+    /* Bảng màu tối phong cách Liquid Glass — tông xanh dương Telegram */
+    --bg-void: #070a12;
+    --glass-bg: rgba(14, 20, 32, 0.55);
+    --glass-bg-elevated: rgba(22, 30, 46, 0.6);
+    --glass-bg-surface: rgba(30, 40, 58, 0.5);
+    --glass-bg-surface-2: rgba(40, 54, 76, 0.62);
+    --glass-blur: 34px;
+    --glass-sat: 180%;
+
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-border-hover: rgba(255, 255, 255, 0.22);
+    --glass-highlight: rgba(255, 255, 255, 0.5);
+    --line: rgba(255, 255, 255, 0.06);
+
+    --text-primary: #f2f6fb;
+    --text-muted: #93a3bd;
+    --text-faint: #5e6d88;
+
+    /* Gradient nhấn — xanh dương Telegram */
+    --accent-a: #62c1ff;
+    --accent-b: #2AABEE;
+    --accent-c: #1e88c9;
+    --accent-grad: linear-gradient(135deg, #62c1ff, #2AABEE 55%, #1e88c9);
+    --accent-glow: rgba(42, 171, 238, 0.35);
+    --danger: #ff5263;
+    --radius-lg: 22px;
+    --radius-md: 16px;
+    --radius-sm: 11px;
+    --ease-spring: cubic-bezier(.34,1.56,.64,1);
+    --nav-h: 60px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-serif;-webkit-tap-highlight-color:transparent;}
+  h1,h2,h3,.brand,.new-chat-btn,.top-bar h1{font-family:'Sora',-apple-system,sans-serif;}
+
+  html{height:100%;overflow:hidden;overscroll-behavior:none;-webkit-text-size-adjust:100%;}
+  body {
+    background: var(--bg-void);
+    height: calc(var(--app-height, 100vh));
+    color: var(--text-primary);
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  body::before, body::after {
+    content: '';
+    position: absolute;
+    width: 420px;
+    height: 420px;
+    border-radius: 50%;
+    filter: blur(140px);
+    z-index: 0;
+    opacity: 0.28;
+    pointer-events: none;
+    animation: pulseGlow 12s infinite alternate ease-in-out;
+    will-change: transform;
+  }
+  body::before { background: #2AABEE; top: 6%; left: 8%; }
+  body::after  { background: #1e5f9e; bottom: 10%; right: 8%; animation-delay: 4s; }
+  @keyframes pulseGlow {
+    0% { transform: scale(1) translate(0, 0); opacity: 0.20; }
+    100% { transform: scale(1.25) translate(30px, 20px); opacity: 0.36; }
+  }
+
+  ::-webkit-scrollbar{width:6px;height:6px;}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.14);border-radius:10px;}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.24);}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  /* ---------- App shell ---------- */
+  .app-shell{
+    height:100%;
+    max-width:520px;
+    margin:0 auto;
+    position:relative;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    box-shadow: 0 24px 70px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.08);
+    border-left:1px solid var(--glass-border);
+    border-right:1px solid var(--glass-border);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    z-index:1;
+  }
+  @media (min-width:760px){ .app-shell{ max-width:460px; margin:14px auto; height:calc(var(--app-height, 100vh) - 28px); border-radius:28px; border:1px solid var(--glass-border);} }
+
+  .screens{ position:relative; flex:1; min-height:0; }
+  .screen{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; min-height:0;
+    background:transparent;
+    opacity:0; pointer-events:none;
+    transform:translateY(6px);
+    transition:opacity .18s ease, transform .22s var(--ease-spring);
+  }
+  .screen.active{ opacity:1; pointer-events:auto; transform:translateY(0); }
+  .screen-overlay{
+    z-index:12;
+    transform:translateY(100%);
+    transition:transform .32s var(--ease-spring);
+  }
+  .screen-overlay.active{ transform:translateY(0); }
+
+  /* ---------- Top bar ---------- */
+  .top-bar{
+    background: rgba(12, 17, 28, 0.4);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    padding: calc(14px + env(safe-area-inset-top)) 18px 13px;
+    display:flex; align-items:center; gap:12px;
+    border-bottom:1px solid var(--glass-border);
+    flex-shrink:0; position:relative; z-index:5;
+  }
+  .top-bar h1{ font-size:20px; font-weight:700; flex:1; letter-spacing:.2px; }
+  .top-bar .sub{ font-size:11.5px; color:var(--text-muted); margin-top:1px; font-weight:500; }
+
+  .icon-btn.round{
+    width:36px;height:36px;border-radius:50%;
+    background:var(--glass-bg-surface);
+    border:1px solid var(--glass-border);
+    color:var(--text-muted);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer; transition:.2s var(--ease-spring); flex-shrink:0;
+  }
+  .icon-btn.round svg{width:16px;height:16px;}
+  .icon-btn.round:hover{ color:var(--text-primary); border-color:var(--accent-b); }
+  .icon-btn.round:active{ transform:scale(.92); }
+
+  /* ---------- Chats list screen ---------- */
+  .search-wrap{ padding:10px 16px 6px; flex-shrink:0; }
+  .search-box{
+    display:flex; align-items:center; gap:9px;
+    background: rgba(8,11,20,0.45);
+    border:1px solid var(--glass-border);
+    border-radius:20px; padding:9px 14px;
+  }
+  .search-box svg{width:15px;height:15px;color:var(--text-faint);flex-shrink:0;}
+  .search-box input{
+    flex:1; border:none; outline:none; background:none;
+    color:var(--text-primary); font-size:13.5px;
+  }
+  .search-box input::placeholder{ color:var(--text-faint); }
+
+  .chats-list{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:4px 10px 90px; }
+  .chat-row{
+    display:flex; align-items:center; gap:12px;
+    padding:11px 10px; border-radius:16px; cursor:pointer;
+    transition:.15s; position:relative;
+  }
+  .chat-row:hover{ background:var(--glass-bg-elevated); }
+  .chat-row:active{ background:var(--glass-bg-surface); }
+  .chat-avatar{
+    width:48px;height:48px;border-radius:50%;flex-shrink:0;
+    background:var(--accent-grad);
+    display:flex;align-items:center;justify-content:center;
+    color:#0b2333; font-weight:700; font-size:16px;
+    box-shadow:0 4px 14px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.35);
+    position:relative; overflow:hidden;
+  }
+  .chat-avatar::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 30% 25%, rgba(255,255,255,.55), transparent 60%);}
+  .chat-meta{ flex:1; min-width:0; }
+  .chat-meta-top{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .chat-title{ font-size:14.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .chat-time{ font-size:11px; color:var(--text-faint); flex-shrink:0; }
+  .chat-preview{ font-size:12.5px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+  .chat-row .del-btn{
+    background:none;border:none;color:var(--text-faint);cursor:pointer;
+    padding:7px;border-radius:9px; opacity:0; transition:.15s; flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .chat-row .del-btn svg{width:14px;height:14px;}
+  .chat-row:hover .del-btn{ opacity:1; }
+  .chat-row .del-btn:hover{ color:var(--danger); background:rgba(255,82,99,.15); }
+  .chats-empty{ text-align:center; color:var(--text-faint); font-size:13px; padding:60px 30px; line-height:1.6; }
+
+  .fab{
+    position:absolute; right:18px; bottom:calc(var(--nav-h) + 18px + env(safe-area-inset-bottom));
+    width:56px;height:56px;border-radius:50%;
+    background:var(--accent-grad); border:none; color:#08203a;
+    display:flex;align-items:center;justify-content:center; cursor:pointer;
+    box-shadow:0 10px 28px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.4);
+    transition:.2s var(--ease-spring); z-index:6;
+  }
+  .fab svg{width:24px;height:24px;}
+  .fab:hover{ transform:translateY(-2px) scale(1.04); }
+  .fab:active{ transform:scale(.93); }
+
+  /* ---------- Chat view screen ---------- */
+  .chat-container{ flex:1; display:flex; flex-direction:column; min-height:0; }
+  .header{
+    background: rgba(12, 17, 28, 0.4);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    padding: calc(12px + env(safe-area-inset-top)) 12px 12px;
+    display:flex; align-items:center; gap:8px;
+    border-bottom:1px solid var(--glass-border);
+    flex-shrink:0; position:relative; z-index:5;
+  }
+  .back-btn{ width:34px;height:34px;border-radius:50%; background:none; border:none; color:var(--text-primary); display:flex;align-items:center;justify-content:center; cursor:pointer; flex-shrink:0; }
+  .back-btn svg{width:20px;height:20px;}
+  .back-btn:active{ transform:scale(.9); }
+  .header-avatar{
+    width:34px;height:34px;border-radius:50%;flex-shrink:0;
+    background:var(--accent-grad); display:flex;align-items:center;justify-content:center;
+    color:#08203a; font-weight:700; font-size:13px; box-shadow:inset 0 1px 0 rgba(255,255,255,.35);
+  }
+  .header-titles{ flex:1; min-width:0; }
+  .header h2{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .header .header-sub{ font-size:11px; color:var(--text-muted); margin-top:1px; }
+
+  .model-badge{
+    font-size:11.5px; font-weight:500; color:var(--text-muted);
+    background:var(--glass-bg-surface); border:1px solid var(--glass-border);
+    padding:6px 10px; border-radius:20px; flex-shrink:0;
+    display:flex; align-items:center; gap:5px; cursor:pointer; transition:.2s;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .model-badge:hover{ border-color: var(--accent-b); color:var(--text-primary); background:var(--glass-bg-surface-2); }
+  .model-badge:active{transform:scale(.96);}
+  .model-badge .chevron{width:10px;height:10px;transition:transform .25s var(--ease-spring);flex-shrink:0;}
+  .model-badge.open .chevron{transform:rotate(180deg);}
+  .model-switch-wrap{position:relative;flex-shrink:0;}
+
+  .model-switch-panel{
+    position:absolute;top:calc(100% + 8px);right:0;min-width:230px;z-index:30;
+    background: rgba(16, 22, 36, 0.85);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-radius:var(--radius-lg);
+    box-shadow:0 20px 50px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.1);
+    padding:8px;display:none;flex-direction:column;gap:2px;
+    animation: popIn .22s var(--ease-spring);
+  }
+  @keyframes popIn{from{opacity:0;transform:translateY(-6px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
+  .model-switch-panel.open{display:flex;}
+  .model-switch-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--radius-md);cursor:pointer;transition:.15s;}
+  .model-switch-item:hover{background:var(--glass-bg-surface-2);}
+  .model-switch-item .msi-check{width:16px;flex-shrink:0;margin-top:2px;color:var(--accent-a);}
+  .model-switch-item .msi-check svg{width:15px;height:15px;display:none;}
+  .model-switch-item.active .msi-check svg{display:block;}
+  .model-switch-item .msi-name{font-size:14px;font-weight:600;color:var(--text-primary);font-family:'Sora',sans-serif;}
+  .model-switch-item .msi-desc{font-size:11.5px;color:var(--text-muted);margin-top:2px;}
+
+  .messages{
+    flex:1; min-height:0; overflow-y:auto; overflow-x:hidden;
+    overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y;
+    -webkit-user-select:text; user-select:text;
+    padding:16px; display:flex; flex-direction:column; gap:10px; position:relative;
+  }
+  .msg{
+    max-width:80%; padding:11px 15px; border-radius:var(--radius-lg);
+    word-wrap:break-word; font-size:14px; line-height:1.6;
+    animation:fade .22s var(--ease-spring); border:1px solid var(--glass-border);
+    position:relative; user-select:text;
+  }
+  .msg.user{
+    align-self:flex-end;
+    background: linear-gradient(135deg, #2AABEE 0%, #1b6fb0 100%);
+    color:#fff; border-bottom-right-radius:5px; border:none;
+    box-shadow: 0 4px 15px rgba(42, 171, 238, 0.3), inset 0 1px 0 rgba(255,255,255,.2);
+  }
+  .msg.bot{
+    align-self:flex-start; background: rgba(255,255,255,0.055); color:var(--text-primary);
+    border-bottom-left-radius:5px;
+    backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .msg.bot p{margin:4px 0;}
+  .msg.bot ul,.msg.bot ol{padding-left:20px;margin:4px 0;}
+  .msg.bot code{background:rgba(0,0,0,0.35);padding:2px 6px;border-radius:4px;font-family:'Courier New',monospace;font-size:13px;border:1px solid var(--glass-border);}
+
+  .code-card{ margin:8px 0; border-radius:10px; overflow:hidden; background: rgba(5,8,14,0.8); border:1px solid var(--glass-border); }
+  .code-card-head{ display:flex;align-items:center;justify-content:space-between; padding:6px 10px; background: rgba(255,255,255,0.03); border-bottom:1px solid var(--glass-border); font-size:10.5px;color:var(--text-muted);font-family:'Courier New',monospace; }
+  .code-card-lang{text-transform:lowercase;letter-spacing:.3px;}
+  .code-copy-btn{ display:flex;align-items:center;gap:5px;border:none; background:rgba(255,255,255,0.05); color:var(--text-primary); font-size:11px;font-weight:600;padding:4px 9px;border-radius:8px;cursor:pointer;transition:.15s; }
+  .code-copy-btn:hover{background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);}
+  .code-copy-btn:active{transform:scale(.94);}
+  .code-copy-btn svg{width:11px;height:11px;}
+  .code-card pre{margin:0;padding:11px 13px;overflow-x:auto;background:none;border-radius:0;}
+  .code-card pre code{background:none;padding:0;font-size:12.5px;}
+
+  .msg-copy-btn{
+    display:inline-flex;align-items:center;gap:4px;margin-top:6px;
+    padding:3px 9px;border-radius:20px; border:1px solid rgba(255,255,255,0.06);
+    background:rgba(255,255,255,0.04); color:var(--text-faint);font-size:10px;cursor:pointer;transition:.15s;
+  }
+  .msg-copy-btn:hover{color:var(--text-primary);background:rgba(255,255,255,.08);}
+  .msg-copy-btn:active{transform:scale(.94);}
+  .msg-copy-btn svg{width:10px;height:10px;}
+
+  .msg.system{
+    align-self:center; background: rgba(255,255,255,0.04); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border:1px solid var(--glass-border); color:var(--text-muted);font-size:11.5px;padding:6px 16px;border-radius:20px;max-width:90%;text-align:center;
+  }
+  .msg .file-preview{max-width:100%;max-height:220px;border-radius:10px;margin-top:8px;display:block;}
+  .file-chip{ display:flex;align-items:center;gap:7px; background:rgba(0,0,0,0.25); border:1px solid var(--glass-border); padding:6px 10px;border-radius:10px;margin-top:8px;font-size:12px;color:var(--text-muted); }
+  .file-chip.expired{opacity:.6;font-style:italic;}
+
+  .typing{
+    align-self:flex-start;display:flex;gap:4px;padding:13px 16px;
+    background: rgba(255,255,255,0.05); backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border-radius:var(--radius-lg);border-bottom-left-radius:5px; border: 1px solid var(--glass-border);
+  }
+  .typing span{width:6px;height:6px;border-radius:50%;background:var(--text-muted);animation:bounce 1.1s infinite ease-in-out;}
+  .typing span:nth-child(2){animation-delay:.15s;}
+  .typing span:nth-child(3){animation-delay:.3s;}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-4px);opacity:1;}}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  .input-area{
+    background: rgba(12, 17, 28, 0.4);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    border-top:1px solid var(--glass-border); box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    padding:10px 12px calc(12px + env(safe-area-inset-bottom)); flex-shrink:0; position:relative; z-index:5;
+  }
+  .attach-preview{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+  .attach-preview:empty{display:none;}
+  .attach-chip{ display:flex;align-items:center;gap:6px; background:var(--glass-bg-surface); border:1px solid var(--glass-border); padding:5px 8px 5px 11px;border-radius:20px;font-size:11.5px;color:var(--text-muted); }
+  .attach-chip button{background:none;border:none;color:var(--text-faint);cursor:pointer;padding:3px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:.15s;}
+  .attach-chip button svg{width:10px;height:10px;}
+  .attach-chip button:hover{color:#fff;background:rgba(255,82,99,.75);}
+
+  .input-row{display:flex;gap:8px;align-items:center;}
+  .attach-wrap{position:relative;flex-shrink:0;}
+  .attach-btn{
+    flex-shrink:0;width:38px;height:38px;border-radius:50%;
+    background:var(--glass-bg-surface); border:1px solid var(--glass-border);
+    color:var(--text-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s var(--ease-spring);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .attach-btn svg{width:17px;height:17px;transition:transform .25s var(--ease-spring);}
+  .attach-btn:hover{border-color: var(--accent-b); color:var(--text-primary); transform: scale(1.06);}
+  .attach-btn:active{transform:scale(.94);}
+  .attach-btn.open{color:#fff;border-color:var(--accent-b);}
+  .attach-btn.open svg{transform:rotate(45deg);}
+
+  .attach-menu{
+    position:absolute;bottom:calc(100% + 10px);left:0;min-width:168px;z-index:30;
+    background: rgba(16, 22, 36, 0.85); border: 1px solid var(--glass-border);
+    backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+    border-radius:var(--radius-lg); box-shadow:0 20px 50px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.1);
+    padding:8px;display:none;flex-direction:column;gap:2px; animation: popIn .22s var(--ease-spring);
+  }
+  .attach-menu.open{display:flex;}
+  .attach-menu-item{ display:flex;align-items:center;gap:10px; padding:9px 12px;border-radius:var(--radius-md); cursor:pointer;font-size:13.5px;font-weight:500;color:var(--text-primary); transition:.15s; }
+  .attach-menu-item svg{width:17px;height:17px;flex-shrink:0;color:var(--text-muted);}
+  .attach-menu-item:hover{background:var(--glass-bg-surface-2);}
+  .attach-menu-item:hover svg{color:var(--text-primary);}
+  .attach-menu-item input{display:none;}
+
+  .input-area input[type="text"]{
+    flex:1;padding:10px 16px; border:1px solid var(--glass-border); border-radius:22px;
+    background: rgba(5,8,14,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color:#fff;font-size:14px;outline:none; box-shadow: inset 0 1px 0 rgba(255,255,255,.04); transition: 0.2s;
+  }
+  .input-area input[type="text"]:focus{ border-color: var(--accent-b); background: rgba(5,8,14,0.72); box-shadow: 0 0 0 4px var(--accent-glow); }
+  .input-area input[type="text"]::placeholder{color:var(--text-faint);}
+
+  .btn-send{
+    flex-shrink:0;width:38px;height:38px;border-radius:50%;
+    background:var(--accent-grad); color:#08203a;border:none;cursor:pointer;transition:.2s var(--ease-spring);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow: 0 4px 15px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.4);
+  }
+  .btn-send svg{width:16px;height:16px;margin-left:-1px;}
+  .btn-send:hover:not(:disabled){filter:brightness(1.08); transform: scale(1.06);}
+  .btn-send:active:not(:disabled){transform: scale(.92);}
+  .btn-send:disabled{opacity:.35;cursor:not-allowed;filter:none;transform: none;}
+
+  .status{color:var(--text-faint);font-size:10.5px;padding:6px 14px 0;text-align:center;}
+
+  /* ---------- Settings screen ---------- */
+  .settings-scroll, .account-scroll{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:14px 16px calc(var(--nav-h) + 30px + env(safe-area-inset-bottom)); }
+  .settings-section{ margin-bottom:18px; }
+  .settings-section-title{ font-size:11.5px; font-weight:700; color:var(--text-faint); text-transform:uppercase; letter-spacing:.6px; margin:0 4px 8px; }
+  .settings-card{
+    background: var(--glass-bg-elevated); border:1px solid var(--glass-border);
+    border-radius:var(--radius-lg); overflow:hidden;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .settings-row{ padding:12px 14px; border-bottom:1px solid var(--glass-border); }
+  .settings-row:last-child{ border-bottom:none; }
+  .settings-row label{ display:flex; align-items:center; gap:7px; color:var(--text-muted); font-size:11.5px; margin-bottom:6px; font-weight:600; }
+  .settings-row label svg{width:13px;height:13px;flex-shrink:0;opacity:.85;}
+  .settings-row input, .settings-row textarea, .settings-row select{
+    width:100%; padding:9px 12px; border:1px solid var(--glass-border); border-radius:11px;
+    background: rgba(6,9,16,0.5); color:var(--text-primary); font-size:13.5px; outline:none; transition:.2s;
+  }
+  .settings-row input:focus, .settings-row textarea:focus, .settings-row select:focus{
+    border-color: var(--accent-b); background: rgba(6,9,16,0.8); box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .settings-row textarea{resize:vertical;min-height:60px;}
+  .settings-row .row-2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .key-row{display:flex;gap:6px;}
+  .key-row input{flex:1;}
+  .key-row button{
+    background:var(--glass-bg-surface-2); border:1px solid var(--glass-border); color:var(--text-primary);
+    padding:0 16px; border-radius:11px; cursor:pointer; font-size:12.5px; font-weight:600; white-space:nowrap; transition:.2s;
+  }
+  .key-row button:hover{ border-color: var(--accent-b); }
+  .key-row button:active{transform:scale(.96);}
+
+  .btn-primary{
+    width:100%; background:var(--accent-grad); border:none;color:#08203a; padding:13px; border-radius:16px;
+    font-weight:700; cursor:pointer; font-size:14px; display:flex;align-items:center;justify-content:center;gap:8px;
+    box-shadow: 0 6px 20px var(--accent-glow); transition: 0.2s var(--ease-spring);
+  }
+  .btn-primary svg{width:15px;height:15px;}
+  .btn-primary:hover{ transform: translateY(-1px); }
+  .btn-primary:active{transform:scale(.97);}
+
+  .btn-secondary{
+    width:100%; background:var(--glass-bg-surface); border:1px solid var(--glass-border); color:var(--text-primary);
+    padding:12px; border-radius:16px; font-weight:600; cursor:pointer; font-size:13.5px;
+    display:flex;align-items:center;justify-content:center;gap:8px; transition:.2s;
+  }
+  .btn-secondary svg{width:15px;height:15px;}
+  .btn-secondary:hover{ border-color:var(--accent-b); color:#fff; }
+  .btn-secondary:active{transform:scale(.97);}
+
+  /* ---------- Account screen ---------- */
+  .account-hero{ display:flex; flex-direction:column; align-items:center; padding:18px 0 26px; gap:10px; }
+  .account-avatar{
+    width:88px;height:88px;border-radius:50%; background:var(--accent-grad);
+    display:flex;align-items:center;justify-content:center; color:#08203a; font-weight:800; font-size:30px;
+    box-shadow:0 12px 34px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,.4); position:relative;
+  }
+  .account-avatar::after{content:'';position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 30% 25%, rgba(255,255,255,.55), transparent 60%);}
+  .account-name{ font-size:18px; font-weight:700; }
+  .account-status{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); }
+  .status-dot{ width:8px;height:8px;border-radius:50%; background:var(--danger); box-shadow:0 0 8px var(--danger); }
+  .status-dot.on{ background:#3ddc84; box-shadow:0 0 8px #3ddc84; }
+
+  .stat-row{ display:flex; gap:10px; margin-bottom:18px; }
+  .stat-card{
+    flex:1; background:var(--glass-bg-elevated); border:1px solid var(--glass-border); border-radius:var(--radius-md);
+    padding:12px; text-align:center;
+  }
+  .stat-num{ font-size:20px; font-weight:800; color:var(--accent-a); }
+  .stat-label{ font-size:10.5px; color:var(--text-muted); margin-top:2px; }
+
+  .link-list{ background:var(--glass-bg-elevated); border:1px solid var(--glass-border); border-radius:var(--radius-lg); overflow:hidden; margin-bottom:16px; }
+  .link-row{
+    display:flex; align-items:center; gap:12px; padding:13px 14px; cursor:pointer; transition:.15s;
+    border-bottom:1px solid var(--glass-border);
+  }
+  .link-row:last-child{ border-bottom:none; }
+  .link-row:hover{ background:var(--glass-bg-surface); }
+  .link-row:active{ transform:scale(.99); }
+  .link-icon{
+    width:32px;height:32px;border-radius:9px; flex-shrink:0; display:flex;align-items:center;justify-content:center;
+    background:var(--glass-bg-surface-2); color:var(--accent-a);
+  }
+  .link-icon svg{width:16px;height:16px;}
+  .link-text{ flex:1; }
+  .link-title{ font-size:13.5px; font-weight:600; }
+  .link-sub{ font-size:11px; color:var(--text-faint); margin-top:1px; }
+  .link-row .chev{width:14px;height:14px;color:var(--text-faint);flex-shrink:0;}
+  .about-note{ text-align:center; font-size:11px; color:var(--text-faint); padding:8px 20px 4px; line-height:1.7; }
+
+  /* ---------- Bottom nav ---------- */
+  .bottom-nav{
+    display:flex; flex-shrink:0; z-index:8;
+    background: rgba(10, 15, 25, 0.55);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat)); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+    border-top:1px solid var(--glass-border);
+    padding-bottom:env(safe-area-inset-bottom);
+    transition: transform .28s var(--ease-spring), opacity .2s ease;
+  }
+  .bottom-nav.hidden{ transform:translateY(100%); opacity:0; pointer-events:none; }
+  .nav-btn{
+    flex:1; background:none; border:none; color:var(--text-faint); cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    padding:9px 4px 8px; font-size:10.5px; font-weight:600; transition:.2s;
+  }
+  .nav-btn svg{width:22px;height:22px;transition:.2s;}
+  .nav-btn.active{ color:var(--accent-a); }
+  .nav-btn:active{ transform:scale(.93); }
+  .nav-badge{
+    position:absolute; margin-left:14px; margin-top:-2px;
+    background:var(--danger); color:#fff; font-size:9px; font-weight:700;
+    min-width:15px; height:15px; border-radius:8px; display:flex; align-items:center; justify-content:center; padding:0 3px;
+  }
+
+  @media (max-width:380px){
+    .stat-row{ flex-wrap:wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="screens">
+
+    <!-- ============ SCREEN: Chats list ============ -->
+    <section class="screen active" id="screen-chats">
+      <header class="top-bar">
+        <h1>Trò chuyện</h1>
+        <button class="icon-btn round" id="newChatTopBtn" title="Cuộc trò chuyện mới">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+        </button>
+      </header>
+      <div class="search-wrap">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+          <input type="text" id="searchInput" placeholder="Tìm cuộc trò chuyện">
+        </div>
+      </div>
+      <div class="chats-list" id="chatsList"></div>
+      <button class="fab" id="fabNewChat" title="Cuộc trò chuyện mới">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+    </section>
+
+    <!-- ============ SCREEN: Chat view (overlay) ============ -->
+    <section class="screen screen-overlay" id="screen-chatview">
+      <div class="chat-container">
+        <div class="header">
+          <button id="backToChatsBtn" class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+          <div class="header-avatar" id="headerAvatar">AI</div>
+          <div class="header-titles">
+            <h2 id="sessionTitle">Cuộc trò chuyện mới</h2>
+            <div class="header-sub" id="headerSub">Gemini Chat</div>
+          </div>
+          <div class="model-switch-wrap" id="modelSwitchWrap">
+            <button class="model-badge" id="modelBadge" type="button">
+              <span id="modelBadgeText">Gemini 3.5 Flash</span>
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+            </button>
+            <div class="model-switch-panel" id="modelSwitchPanel"></div>
+          </div>
+        </div>
+
+        <div class="messages" id="msgContainer"></div>
+
+        <div class="input-area">
+          <div class="attach-preview" id="attachPreview"></div>
+          <div class="input-row">
+            <div class="attach-wrap" id="attachWrap">
+              <button type="button" class="attach-btn" id="attachBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"></path></svg></button>
+              <div class="attach-menu" id="attachMenu">
+                <label class="attach-menu-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+                  <span>Ảnh</span>
+                  <input type="file" id="fileInputImage" accept="image/*" multiple>
+                </label>
+                <label class="attach-menu-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="5" width="15" height="14" rx="2"></rect><path d="M23 7l-7 5 7 5V7z"></path></svg>
+                  <span>Video</span>
+                  <input type="file" id="fileInputVideo" accept="video/*" multiple>
+                </label>
+                <label class="attach-menu-item">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"></path></svg>
+                  <span>Tệp</span>
+                  <input type="file" id="fileInput" multiple>
+                </label>
+              </div>
+            </div>
+            <input type="text" id="userInput" placeholder="Cần API Key" disabled>
+            <button class="btn-send" id="sendBtn" disabled><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg></button>
+          </div>
+        </div>
+        <div class="status" id="statusMsg">⛔ Vui lòng nhập API Key</div>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN: Settings ============ -->
+    <section class="screen" id="screen-settings">
+      <header class="top-bar"><h1>Cài đặt</h1></header>
+      <div class="settings-scroll">
+
+        <div class="settings-section">
+          <div class="settings-section-title">Kết nối</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <label><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>API Key</label>
+              <div class="key-row">
+                <input type="text" id="apiKeyInput" placeholder="Nhập API Key">
+                <button id="setKeyBtn">Lưu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Mô hình &amp; an toàn</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <label><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"></path><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"></path></svg>Model</label>
+              <select id="modelSelect">
+                <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option>
+                <option value="gemini-3.5-flash" selected>Gemini 3.5 Flash</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                <option value="gemini-2.5-pro-preview-03-25">Gemini 2.5 Pro</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <label><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4.5 8-11.8V5l-8-3-8 3v5.2C4 17.5 12 22 12 22z"></path></svg>Bộ lọc an toàn (Safety)</label>
+              <select id="safetySelect">
+                <option value="BLOCK_NONE" selected>BLOCK_NONE (Tắt lọc hoàn toàn)</option>
+                <option value="BLOCK_ONLY_HIGH">BLOCK_ONLY_HIGH (Chỉ chặn bạo lực cực đoan)</option>
+                <option value="BLOCK_MEDIUM_AND_ABOVE">BLOCK_MEDIUM_AND_ABOVE (Mặc định)</option>
+                <option value="BLOCK_LOW_AND_ABOVE">BLOCK_LOW_AND_ABOVE (Lọc chặt chẽ)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Tham số sinh nội dung</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div class="row-2">
+                <div>
+                  <label><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 00-5 0v11.26a4.5 4.5 0 105 0z"></path></svg>Temp</label>
+                  <input type="number" id="tempInput" min="0" max="2" step=".1" value=".7">
+                </div>
+                <div>
+                  <label><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h16"></path></svg>Max tokens</label>
+                  <input type="number" id="maxTokensInput" min="1" max="8192" value="800">
+                </div>
+              </div>
+            </div>
+            <div class="settings-row">
+              <div class="row-2">
+                <div>
+                  <label><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle></svg>Top P</label>
+                  <input type="number" id="topPInput" min="0" max="1" step=".05" value=".95">
+                </div>
+                <div>
+                  <label><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"></path></svg>Top K</label>
+                  <input type="number" id="topKInput" min="1" max="40" value="40">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-section-title">Hướng dẫn hệ thống</div>
+          <div class="settings-card">
+            <div class="settings-row">
+              <label><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0112 4.5v15a2.5 2.5 0 01-4.96.44 2.5 2.5 0 01-2.96-3.08A3 3 0 013 13.5a3 3 0 01-.34-4.44A2.5 2.5 0 015.5 6a2.5 2.5 0 014-3z"></path><path d="M14.5 2A2.5 2.5 0 0012 4.5v15a2.5 2.5 0 004.96.44 2.5 2.5 0 002.96-3.08A3 3 0 0021 13.5a3 3 0 00.34-4.44A2.5 2.5 0 0018.5 6a2.5 2.5 0 00-4-3z"></path></svg>System Instruction</label>
+              <textarea id="sysInstrInput" rows="3">Bạn là trợ lý AI thông minh. Trả lời chi tiết, rõ ràng, có cấu trúc. Sử dụng xuống dòng, bullet points nếu cần.</textarea>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="saveSettingsBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"></path><path d="M17 21v-8H7v8M7 3v5h8"></path></svg>
+          Lưu cài đặt
+        </button>
+      </div>
+    </section>
+
+    <!-- ============ SCREEN: Account ============ -->
+    <section class="screen" id="screen-account">
+      <header class="top-bar"><h1>Tài khoản</h1></header>
+      <div class="account-scroll">
+        <div class="account-hero">
+          <div class="account-avatar">AI</div>
+          <div class="account-name">Gemini Chat</div>
+          <div class="account-status"><span class="status-dot" id="keyStatusDot"></span><span id="keyStatusText">Chưa có API Key</span></div>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-card"><div class="stat-num" id="statSessions">0</div><div class="stat-label">Cuộc trò chuyện</div></div>
+          <div class="stat-card"><div class="stat-num" id="statMessages">0</div><div class="stat-label">Tin nhắn</div></div>
+          <div class="stat-card"><div class="stat-num" id="statModel">—</div><div class="stat-label">Model hiện tại</div></div>
+        </div>
+
+        <div class="link-list">
+          <div class="link-row" id="goSettingsFromAccount">
+            <div class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path></svg></div>
+            <div class="link-text"><div class="link-title">Cài đặt trò chuyện</div><div class="link-sub">API key, model, tham số</div></div>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+          </div>
+          <div class="link-row" id="installPwaBtn">
+            <div class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0l-4-4m4 4l4-4M5 21h14"></path></svg></div>
+            <div class="link-text"><div class="link-title">Cài đặt lên màn hình chính</div><div class="link-sub" id="installPwaSub">Mở như một ứng dụng thật</div></div>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+          </div>
+          <div class="link-row" id="downloadSourceBtn">
+            <div class="link-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg></div>
+            <div class="link-text"><div class="link-title">Tải mã nguồn (.html)</div><div class="link-sub">Sao lưu trang này về máy</div></div>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+          </div>
+          <div class="link-row" id="clearAllBtn">
+            <div class="link-icon" style="color:var(--danger);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"></path></svg></div>
+            <div class="link-text"><div class="link-title">Xoá toàn bộ lịch sử chat</div><div class="link-sub">Không thể hoàn tác</div></div>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+          </div>
+        </div>
+
+        <div class="about-note">Gemini Chat · Ứng dụng chat AI cá nhân<br>Dữ liệu &amp; API Key được lưu cục bộ trên thiết bị của bạn.</div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============ Bottom navigation ============ -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-btn active" data-tab="chats">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path></svg>
+      <span>Trò chuyện</span>
+    </button>
+    <button class="nav-btn" data-tab="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path></svg>
+      <span>Cài đặt</span>
+    </button>
+    <button class="nav-btn" data-tab="account">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      <span>Tài khoản</span>
+    </button>
+  </nav>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const msgContainer=$('msgContainer'), userInput=$('userInput'), sendBtn=$('sendBtn');
+  const apiKeyInput=$('apiKeyInput'), setKeyBtn=$('setKeyBtn'), statusMsg=$('statusMsg');
+  const modelSelect=$('modelSelect'), tempInput=$('tempInput'), maxTokensInput=$('maxTokensInput');
+  const topPInput=$('topPInput'), topKInput=$('topKInput'), sysInstrInput=$('sysInstrInput'), safetySelect=$('safetySelect');
+  const saveBtn=$('saveSettingsBtn'), fileInput=$('fileInput'), attachPreview=$('attachPreview');
+  const attachWrap=$('attachWrap'), attachBtn=$('attachBtn'), attachMenu=$('attachMenu');
+  const fileInputImage=$('fileInputImage'), fileInputVideo=$('fileInputVideo');
+  const chatsList=$('chatsList'), fabNewChat=$('fabNewChat'), newChatTopBtn=$('newChatTopBtn');
+  const backToChatsBtn=$('backToChatsBtn'), searchInput=$('searchInput');
+  const sessionTitleEl=$('sessionTitle'), headerSub=$('headerSub'), headerAvatar=$('headerAvatar');
+  const modelBadge=$('modelBadge'), modelBadgeText=$('modelBadgeText');
+  const modelSwitchWrap=$('modelSwitchWrap'), modelSwitchPanel=$('modelSwitchPanel');
+  const downloadSourceBtn=$('downloadSourceBtn'), clearAllBtn=$('clearAllBtn');
+  const bottomNav=$('bottomNav'), navBtns=[...document.querySelectorAll('.nav-btn')];
+  const screens={ chats:$('screen-chats'), settings:$('screen-settings'), account:$('screen-account') };
+  const chatViewScreen=$('screen-chatview');
+  const installPwaBtn=$('installPwaBtn'), installPwaSub=$('installPwaSub');
+  const goSettingsFromAccount=$('goSettingsFromAccount');
+
+  const EPHEMERAL_SIZE_LIMIT = 500000;
+
+  let API_KEY = localStorage.getItem('gemini_key') || '';
+  let currentModel = localStorage.getItem('gemini_model') || 'gemini-3.5-flash';
+  let currentSafety = localStorage.getItem('gemini_safety') || 'BLOCK_NONE';
+
+  let sessions = [];
+  let currentSessionId = null;
+  let pendingFiles = [];
+  let activeTab = 'chats';
+
+  const modelMeta = {
+    'gemini-3.1-flash-lite': { label:'Gemini 3.1 Flash-Lite', name:'3.1 Flash-Lite', desc:'Câu trả lời nhanh nhất' },
+    'gemini-3.5-flash': { label:'Gemini 3.5 Flash', name:'3.5 Flash', desc:'Trợ giúp toàn diện' },
+    'gemini-2.0-flash': { label:'Gemini 2.0 Flash', name:'2.0 Flash', desc:'Cân bằng tốc độ và chất lượng' },
+    'gemini-2.5-pro-preview-03-25': { label:'Gemini 2.5 Pro', name:'2.5 Pro', desc:'Suy luận chuyên sâu, tác vụ phức tạp' }
+  };
+
+  apiKeyInput.value = API_KEY;
+  modelSelect.value = currentModel;
+  safetySelect.value = currentSafety;
+  tempInput.value = parseFloat(localStorage.getItem('gemini_temp')) || .7;
+  maxTokensInput.value = parseInt(localStorage.getItem('gemini_maxTokens')) || 800;
+  topPInput.value = parseFloat(localStorage.getItem('gemini_topP')) || .95;
+  topKInput.value = parseInt(localStorage.getItem('gemini_topK')) || 40;
+  sysInstrInput.value = localStorage.getItem('gemini_sysInstr') || sysInstrInput.value;
+
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+  function formatSize(bytes){
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/1024/1024).toFixed(1) + ' MB';
+  }
+  function initialsOf(title){
+    const t = (title||'').trim();
+    if (!t) return 'AI';
+    const parts = t.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return parts[0].slice(0,2).toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  function relativeTime(ts){
+    if (!ts) return '';
+    const diff = Date.now() - ts;
+    const min = Math.floor(diff/60000);
+    if (min < 1) return 'Vừa xong';
+    if (min < 60) return `${min} ph`;
+    const hr = Math.floor(min/60);
+    if (hr < 24) return `${hr} giờ`;
+    const day = Math.floor(hr/24);
+    if (day < 7) return `${day} ngày`;
+    const d = new Date(ts);
+    return `${d.getDate()}/${d.getMonth()+1}`;
+  }
+
+  /* ---------------- Screen / tab navigation ---------------- */
+  function showTab(tab){
+    activeTab = tab;
+    Object.entries(screens).forEach(([name, el]) => el.classList.toggle('active', name === tab));
+    navBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+    bottomNav.classList.remove('hidden');
+    chatViewScreen.classList.remove('active');
+    if (tab === 'chats') renderChatsList();
+    if (tab === 'account') renderAccountStats();
+  }
+  navBtns.forEach(btn => btn.addEventListener('click', () => showTab(btn.dataset.tab)));
+
+  function openChatView(){
+    chatViewScreen.classList.add('active');
+    bottomNav.classList.add('hidden');
+  }
+  function closeChatView(){
+    chatViewScreen.classList.remove('active');
+    bottomNav.classList.remove('hidden');
+    renderChatsList();
+  }
+  backToChatsBtn.addEventListener('click', closeChatView);
+
+  /* ---------------- Sessions: load / save ---------------- */
+  function loadSessions(){
+    try {
+      const raw = JSON.parse(localStorage.getItem('gemini_sessions') || '[]');
+      return Array.isArray(raw) ? raw : [];
+    } catch(e){ return []; }
+  }
+  function serializeForStorage(list){
+    return list.map(s => ({
+      ...s,
+      messages: s.messages.map(m => ({
+        ...m,
+        files: (m.files||[]).map(f => f.ephemeral
+          ? { name:f.name, type:f.type, size:f.size, ephemeral:true }
+          : f)
+      }))
+    }));
+  }
+  function saveSessions(){
+    try {
+      localStorage.setItem('gemini_sessions', JSON.stringify(serializeForStorage(sessions)));
+      if (currentSessionId) localStorage.setItem('gemini_current_session', currentSessionId);
+    } catch(e){
+      addSystemMsg('⚠️ Không thể lưu lịch sử (bộ nhớ trình duyệt đầy). Tệp lớn sẽ không được giữ lại sau khi tải lại trang.');
+    }
+  }
+  function getCurrentSession(){
+    return sessions.find(s => s.id === currentSessionId) || null;
+  }
+  function lastMessageOf(s){
+    if (!s.messages || !s.messages.length) return null;
+    for (let i = s.messages.length-1; i >= 0; i--){
+      if (s.messages[i].role !== 'system') return s.messages[i];
+    }
+    return null;
+  }
+  function lastTsOf(s){
+    const m = s.messages && s.messages.length ? s.messages[s.messages.length-1] : null;
+    return m ? m.ts : s.createdAt;
+  }
+
+  function createSession(){
+    const s = { id: uid(), title:'Cuộc trò chuyện mới', titleSet:false, model: currentModel, createdAt: Date.now(), messages: [] };
+    sessions.unshift(s);
+    currentSessionId = s.id;
+    saveSessions();
+    renderMessages();
+    updateHeader();
+    openChatView();
+    return s;
+  }
+  function selectSession(id){
+    currentSessionId = id;
+    const s = getCurrentSession();
+    if (s) modelSelect.value = s.model || currentModel;
+    renderMessages();
+    updateHeader();
+    localStorage.setItem('gemini_current_session', id);
+    openChatView();
+  }
+  function deleteSession(id){
+    const idx = sessions.findIndex(s => s.id === id);
+    if (idx === -1) return;
+    sessions.splice(idx, 1);
+    if (currentSessionId === id) currentSessionId = null;
+    if (sessions.length === 0) {
+      sessions.push({ id: uid(), title:'Cuộc trò chuyện mới', titleSet:false, model: currentModel, createdAt: Date.now(), messages: [] });
+    }
+    saveSessions();
+    renderChatsList();
+  }
+
+  function updateHeader(){
+    const s = getCurrentSession();
+    sessionTitleEl.textContent = s ? s.title : 'Cuộc trò chuyện mới';
+    headerAvatar.textContent = initialsOf(s ? s.title : '');
+    const activeModel = s?.model || currentModel;
+    const meta = modelMeta[activeModel];
+    modelBadgeText.textContent = meta ? meta.name : activeModel;
+    headerSub.textContent = meta ? meta.label : 'Gemini Chat';
+  }
+
+  /* ---------------- Quick model switcher ---------------- */
+  const CHECK_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>`;
+  function renderModelSwitchPanel(){
+    const activeModel = getCurrentSession()?.model || currentModel;
+    modelSwitchPanel.innerHTML = Object.entries(modelMeta).map(([id, m]) => `
+      <div class="model-switch-item ${id === activeModel ? 'active' : ''}" data-model="${id}">
+        <span class="msi-check">${CHECK_ICON_SVG}</span>
+        <span>
+          <div class="msi-name">${m.name}</div>
+          <div class="msi-desc">${m.desc}</div>
+        </span>
+      </div>`).join('');
+    modelSwitchPanel.querySelectorAll('.model-switch-item').forEach(item => {
+      item.addEventListener('click', () => selectModelQuick(item.dataset.model));
+    });
+  }
+  function openModelSwitch(){ renderModelSwitchPanel(); modelSwitchPanel.classList.add('open'); modelBadge.classList.add('open'); }
+  function closeModelSwitch(){ modelSwitchPanel.classList.remove('open'); modelBadge.classList.remove('open'); }
+  function selectModelQuick(modelId){
+    if (!modelMeta[modelId]) return;
+    currentModel = modelId;
+    localStorage.setItem('gemini_model', currentModel);
+    modelSelect.value = modelId;
+    const s = getCurrentSession();
+    if (s) s.model = modelId;
+    saveSessions();
+    updateHeader();
+    closeModelSwitch();
+    statusMsg.textContent = `✅ Đã đổi sang ${modelMeta[modelId].label}`;
+  }
+  modelBadge.addEventListener('click', (e) => {
+    e.stopPropagation();
+    modelSwitchPanel.classList.contains('open') ? closeModelSwitch() : openModelSwitch();
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.model-switch-wrap')) closeModelSwitch();
+  });
+
+  /* ---------------- Chats list render (Telegram-style) ---------------- */
+  const CHAT_BUBBLE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"></path></svg>`;
+  function renderChatsList(){
+    const query = (searchInput.value || '').trim().toLowerCase();
+    const sorted = [...sessions].sort((a,b) => lastTsOf(b) - lastTsOf(a));
+    const filtered = query ? sorted.filter(s => (s.title||'').toLowerCase().includes(query)) : sorted;
+
+    chatsList.innerHTML = '';
+    if (filtered.length === 0) {
+      chatsList.innerHTML = `<div class="chats-empty">${CHAT_BUBBLE_SVG}<br>Không tìm thấy cuộc trò chuyện nào.<br>Bấm nút + để bắt đầu trò chuyện mới.</div>`;
+      return;
+    }
+    filtered.forEach(s => {
+      const lm = lastMessageOf(s);
+      let preview = 'Chưa có tin nhắn';
+      if (lm) {
+        if (lm.text && lm.text.trim()) preview = (lm.role === 'user' ? 'Bạn: ' : '') + lm.text.trim();
+        else if (lm.files && lm.files.length) preview = (lm.role === 'user' ? 'Bạn: ' : '') + `📎 ${lm.files.length} tệp đính kèm`;
+      }
+      const row = document.createElement('div');
+      row.className = 'chat-row';
+      row.innerHTML = `
+        <div class="chat-avatar">${initialsOf(s.title)}</div>
+        <div class="chat-meta">
+          <div class="chat-meta-top">
+            <div class="chat-title"></div>
+            <div class="chat-time">${relativeTime(lastTsOf(s))}</div>
+          </div>
+          <div class="chat-preview"></div>
+        </div>
+        <button class="del-btn" title="Xoá cuộc trò chuyện"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"></path></svg></button>
+      `;
+      row.querySelector('.chat-title').textContent = s.title || 'Cuộc trò chuyện mới';
+      row.querySelector('.chat-preview').textContent = preview;
+      row.addEventListener('click', () => selectSession(s.id));
+      row.querySelector('.del-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm('Xoá cuộc trò chuyện này?')) deleteSession(s.id);
+      });
+      chatsList.appendChild(row);
+    });
+  }
+  searchInput.addEventListener('input', renderChatsList);
+  fabNewChat.addEventListener('click', createSession);
+  newChatTopBtn.addEventListener('click', createSession);
+
+  /* ---------------- Message rendering ---------------- */
+  function escapeHtml(str){ return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  const COPY_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>`;
+
+  function formatBotText(raw){
+    const codeBlocks = [];
+    let working = raw.replace(/```(\w*)\n?([\s\S]*?)```/g, (m, lang, code) => {
+      const idx = codeBlocks.length;
+      codeBlocks.push({ lang: (lang||'').trim(), code: code.replace(/\n$/, '') });
+      return `\u0000CODEBLOCK${idx}\u0000`;
+    });
+    let text = escapeHtml(working);
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\n[\-•] (.+)/g, '\n<li>$1</li>');
+    text = text.replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g, '<ul>$1</ul>');
+    text = text.replace(/\n/g, '<br>');
+    text = text.replace(/\u0000CODEBLOCK(\d+)\u0000/g, (m, idxStr) => {
+      const b = codeBlocks[Number(idxStr)];
+      const langLabel = escapeHtml(b.lang || 'text');
+      const escapedCode = escapeHtml(b.code);
+      const encodedCode = encodeURIComponent(b.code);
+      return `<div class="code-card">
+        <div class="code-card-head">
+          <span class="code-card-lang">${langLabel}</span>
+          <button class="code-copy-btn" data-code="${encodedCode}">${COPY_ICON_SVG}<span>Sao chép</span></button>
+        </div>
+        <pre><code>${escapedCode}</code></pre>
+      </div>`;
+    });
+    return text;
+  }
+
+  function copyToClipboard(text, btnEl){
+    const done = (ok) => {
+      if (btnEl) {
+        const label = btnEl.querySelector('span:last-child');
+        const prev = label ? label.textContent : null;
+        if (label) label.textContent = ok ? 'Đã chép!' : 'Lỗi';
+        setTimeout(() => { if (label && prev !== null) label.textContent = prev; }, 1500);
+      }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => done(true)).catch(() => fallbackCopy(text, done));
+    } else { fallbackCopy(text, done); }
+  }
+  function fallbackCopy(text, cb){
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      cb(ok);
+    } catch(e) { cb(false); }
+  }
+
+  function renderFileNode(f){
+    const wrap = document.createElement('div');
+    if (!f.base64) {
+      wrap.className = 'file-chip expired';
+      wrap.textContent = `📎 ${f.name} (${formatSize(f.size||0)}) — đã hết hạn sau khi tải lại trang`;
+      return wrap;
+    }
+    if (f.type && f.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = f.base64; img.className = 'file-preview';
+      return img;
+    }
+    if (f.type && f.type.startsWith('video/')) {
+      const vid = document.createElement('video');
+      vid.src = f.base64; vid.className = 'file-preview'; vid.controls = true;
+      return vid;
+    }
+    wrap.className = 'file-chip';
+    wrap.textContent = `📎 ${f.name} (${formatSize(f.size||0)})`;
+    return wrap;
+  }
+
+  function addMessageDom(msg){
+    const div = document.createElement('div');
+    div.className = `msg ${msg.role}`;
+    if (msg.role === 'bot') {
+      div.innerHTML = formatBotText(msg.text || '');
+      div.querySelectorAll('.code-copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => copyToClipboard(decodeURIComponent(btn.dataset.code || ''), btn));
+      });
+    } else {
+      div.textContent = msg.text || '';
+    }
+    (msg.files || []).forEach(f => div.appendChild(renderFileNode(f)));
+    if (msg.text && msg.text.trim().length > 0) {
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'msg-copy-btn';
+      copyBtn.innerHTML = `${COPY_ICON_SVG}<span>Sao chép</span>`;
+      copyBtn.addEventListener('click', () => copyToClipboard(msg.text, copyBtn));
+      div.appendChild(document.createElement('br'));
+      div.appendChild(copyBtn);
+    }
+    msgContainer.appendChild(div);
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+  }
+  function addSystemDom(text){
+    const div = document.createElement('div');
+    div.className = 'msg system';
+    div.textContent = text;
+    msgContainer.appendChild(div);
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+  }
+  function addSystemMsg(text){
+    const s = getCurrentSession();
+    if (s) { s.messages.push({ id: uid(), role:'system', text, ts: Date.now() }); saveSessions(); }
+    addSystemDom(text);
+  }
+  function renderMessages(){
+    msgContainer.innerHTML = '';
+    const s = getCurrentSession();
+    if (!s || s.messages.length === 0) {
+      addSystemDom('🔑 Nhập API Key và bắt đầu chat');
+      addMessageDom({ role:'bot', text:'Chào bạn! Gemini Chat sẵn sàng.\nCó thể gửi ảnh, video, PDF hoặc bất kỳ tệp nào kèm tin nhắn.' });
+      return;
+    }
+    s.messages.forEach(m => { if (m.role === 'system') addSystemDom(m.text); else addMessageDom(m); });
+  }
+  function showTyping(){
+    const div = document.createElement('div');
+    div.className = 'typing'; div.id = 'typingIndicator';
+    div.innerHTML = '<span></span><span></span><span></span>';
+    msgContainer.appendChild(div);
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+  }
+  function hideTyping(){ const el = $('typingIndicator'); if (el) el.remove(); }
+
+  /* ---------------- File handling ---------------- */
+  function fileToBase64(file){
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+  }
+  async function buildFileMeta(file){
+    const base64 = await fileToBase64(file);
+    const isVideo = file.type.startsWith('video/');
+    const tooBig = base64.length > EPHEMERAL_SIZE_LIMIT;
+    return { name: file.name, type: file.type || 'application/octet-stream', size: file.size, base64, ephemeral: isVideo || tooBig };
+  }
+  function renderAttachPreview(){
+    attachPreview.innerHTML = '';
+    pendingFiles.forEach((f, idx) => {
+      const chip = document.createElement('div');
+      chip.className = 'attach-chip';
+      const label = document.createElement('span');
+      label.textContent = `${f.type && f.type.startsWith('image/') ? '🖼️' : f.type && f.type.startsWith('video/') ? '🎬' : '📄'} ${f.name}`;
+      const rm = document.createElement('button');
+      rm.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>';
+      rm.addEventListener('click', () => { pendingFiles.splice(idx,1); renderAttachPreview(); });
+      chip.appendChild(label); chip.appendChild(rm);
+      attachPreview.appendChild(chip);
+    });
+    updateSendState();
+  }
+  function openAttachMenu(){ attachMenu.classList.add('open'); attachBtn.classList.add('open'); }
+  function closeAttachMenu(){ attachMenu.classList.remove('open'); attachBtn.classList.remove('open'); }
+  attachBtn.addEventListener('click', (e) => { e.stopPropagation(); attachMenu.classList.contains('open') ? closeAttachMenu() : openAttachMenu(); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.attach-wrap')) closeAttachMenu(); });
+  function handleFilesPicked(e){
+    pendingFiles.push(...Array.from(e.target.files));
+    renderAttachPreview();
+    e.target.value = '';
+    closeAttachMenu();
+  }
+  fileInput.addEventListener('change', handleFilesPicked);
+  fileInputImage.addEventListener('change', handleFilesPicked);
+  fileInputVideo.addEventListener('change', handleFilesPicked);
+
+  /* ---------------- Gemini API ---------------- */
+  function buildContents(session){
+    const msgs = session.messages.filter(m => m.role !== 'system');
+    return msgs.map((m, i) => {
+      const isLatestUser = i === msgs.length - 1 && m.role === 'user';
+      let parts = [];
+      let text = m.text || '';
+      if (m.files && m.files.length) {
+        if (isLatestUser) {
+          m.files.forEach(f => { if (f.base64) parts.push({ inline_data: { mime_type: f.type, data: f.base64.split(',')[1] } }); });
+        } else {
+          text += ' ' + m.files.map(f => `[tệp đính kèm: ${f.name}]`).join(' ');
+        }
+      }
+      parts.unshift({ text: text || '(tệp đính kèm)' });
+      return { role: m.role === 'bot' ? 'model' : 'user', parts };
+    });
+  }
+
+  async function callGemini(session){
+    if (!API_KEY) { addSystemMsg('❌ Chưa có API Key.'); return; }
+    const model = session.model || currentModel;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`;
+    const usedTemp = parseFloat(tempInput.value) || .7;
+    const usedMaxTokens = parseInt(maxTokensInput.value) || 800;
+    const usedTopP = parseFloat(topPInput.value) || .95;
+    const usedTopK = parseInt(topKInput.value) || 40;
+    const usedSysInstr = sysInstrInput.value || 'Bạn là trợ lý AI.';
+    const selectedSafety = safetySelect.value || 'BLOCK_NONE';
+
+    const buildSafetySettings = (threshold) => [
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: threshold },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: threshold },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: threshold },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: threshold }
+    ];
+    const payload = {
+      contents: buildContents(session),
+      systemInstruction: { parts: [{ text: usedSysInstr }] },
+      safetySettings: buildSafetySettings(selectedSafety),
+      generationConfig: { temperature: usedTemp, maxOutputTokens: usedMaxTokens, topP: usedTopP, topK: usedTopK }
+    };
+    try {
+      statusMsg.textContent = '⏳ Đang xử lý...';
+      showTyping();
+      let response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!response.ok && response.status === 400 && selectedSafety === 'BLOCK_NONE') {
+        const errData = await response.json().catch(() => ({}));
+        const errMsg = errData.error?.message || '';
+        if (errMsg.includes('BLOCK_NONE') || errMsg.includes('safety') || errMsg.includes('SafetyThreshold')) {
+          addSystemMsg('⚠️ Google từ chối quyền BLOCK_NONE trên tài khoản này. Hệ thống tự động kích hoạt chế độ lọc tối thiểu tiếp theo (BLOCK_ONLY_HIGH) để tránh lỗi...');
+          payload.safetySettings = buildSafetySettings('BLOCK_ONLY_HIGH');
+          response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        }
+      }
+      hideTyping();
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        let errMsg = errData.error?.message || 'Lỗi không xác định';
+        if (response.status === 403 || response.status === 401) errMsg = 'Sai key hoặc key không hợp lệ.';
+        if (response.status === 429) errMsg = 'Vượt giới hạn tốc độ (rate limit). Vui lòng thử lại sau.';
+        addSystemMsg(`❌ Lỗi: ${errMsg}`);
+        statusMsg.textContent = '❌ Lỗi';
+        return;
+      }
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '(Không có nội dung do bộ lọc an toàn chặn)';
+      const firstCandidate = data.candidates?.[0];
+      if (firstCandidate && firstCandidate.finishReason === 'SAFETY') {
+        addSystemMsg('⚠️ Nội dung này vi phạm các điều khoản nền tảng cốt lõi của Google (không thể bỏ qua bằng BLOCK_NONE). Hãy viết lại câu hỏi.');
+      }
+      session.messages.push({ id: uid(), role:'bot', text, ts: Date.now() });
+      addMessageDom({ role:'bot', text });
+      saveSessions();
+      statusMsg.textContent = '✅ Nhận phản hồi';
+    } catch (e) {
+      hideTyping();
+      addSystemMsg(`⚠️ Lỗi: ${e.message}`);
+      statusMsg.textContent = '⚠️ Lỗi kết nối';
+    }
+  }
+
+  /* ---------------- Send flow ---------------- */
+  function updateSendState(){
+    const hasKey = API_KEY?.trim()?.length > 0;
+    const hasContent = userInput.value.trim().length > 0 || pendingFiles.length > 0;
+    sendBtn.disabled = !hasKey || !hasContent;
+  }
+  async function handleSend(){
+    const text = userInput.value.trim();
+    if (!text && pendingFiles.length === 0) return;
+    if (!API_KEY) { addSystemMsg('🔑 Vui lòng nhập API Key.'); return; }
+    const session = getCurrentSession() || createSession();
+    const filesMeta = [];
+    for (const f of pendingFiles) filesMeta.push(await buildFileMeta(f));
+    const userMsg = { id: uid(), role:'user', text, files: filesMeta, ts: Date.now() };
+    session.messages.push(userMsg);
+    if (!session.titleSet) {
+      session.title = text ? text.slice(0, 40) : (filesMeta[0] ? filesMeta[0].name : 'Cuộc trò chuyện mới');
+      session.titleSet = true;
+    }
+    pendingFiles = [];
+    renderAttachPreview();
+    addMessageDom(userMsg);
+    updateHeader();
+    saveSessions();
+    userInput.value = '';
+    userInput.disabled = true; sendBtn.disabled = true;
+    statusMsg.textContent = '⏳ Đang xử lý...';
+    await callGemini(session);
+    userInput.disabled = false;
+    userInput.focus();
+    updateSendState();
+    if (API_KEY) statusMsg.textContent = '✅ Sẵn sàng';
+  }
+
+  /* ---------------- Settings ---------------- */
+  function updateChatEnable(){
+    const hasKey = API_KEY?.trim()?.length > 0;
+    userInput.disabled = !hasKey;
+    userInput.placeholder = hasKey ? 'Nhập tin nhắn...' : 'Cần API Key';
+    statusMsg.textContent = hasKey ? '✅ Sẵn sàng' : '⛔ Vui lòng nhập API Key';
+    updateSendState();
+    keyStatusDot.classList.toggle('on', hasKey);
+    keyStatusText.textContent = hasKey ? 'Đã kết nối API Key' : 'Chưa có API Key';
+  }
+  function saveAllSettings(){
+    const key = apiKeyInput.value.trim();
+    API_KEY = key; localStorage.setItem('gemini_key', key);
+    currentModel = modelSelect.value; localStorage.setItem('gemini_model', currentModel);
+    currentSafety = safetySelect.value; localStorage.setItem('gemini_safety', currentSafety);
+    localStorage.setItem('gemini_temp', parseFloat(tempInput.value) || .7);
+    localStorage.setItem('gemini_maxTokens', parseInt(maxTokensInput.value) || 800);
+    localStorage.setItem('gemini_topP', parseFloat(topPInput.value) || .95);
+    localStorage.setItem('gemini_topK', parseInt(topKInput.value) || 40);
+    localStorage.setItem('gemini_sysInstr', sysInstrInput.value || 'Bạn là trợ lý AI.');
+    const s = getCurrentSession();
+    if (s) s.model = currentModel;
+    saveSessions();
+    updateHeader();
+    updateChatEnable();
+    statusMsg.textContent = API_KEY ? '✅ Cài đặt đã lưu' : '⛔ Chưa có key';
+    saveBtn.textContent = '✔ Đã lưu';
+    setTimeout(() => {
+      saveBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"></path><path d="M17 21v-8H7v8M7 3v5h8"></path></svg>Lưu cài đặt';
+    }, 1500);
+  }
+
+  /* ---------------- Account screen ---------------- */
+  const keyStatusDot = $('keyStatusDot'), keyStatusText = $('keyStatusText');
+  const statSessions = $('statSessions'), statMessages = $('statMessages'), statModel = $('statModel');
+  function renderAccountStats(){
+    statSessions.textContent = sessions.length;
+    const totalMsgs = sessions.reduce((sum, s) => sum + s.messages.filter(m => m.role !== 'system').length, 0);
+    statMessages.textContent = totalMsgs;
+    const meta = modelMeta[currentModel];
+    statModel.textContent = meta ? meta.name : currentModel;
+    const hasKey = API_KEY?.trim()?.length > 0;
+    keyStatusDot.classList.toggle('on', hasKey);
+    keyStatusText.textContent = hasKey ? 'Đã kết nối API Key' : 'Chưa có API Key';
+  }
+  goSettingsFromAccount.addEventListener('click', () => showTab('settings'));
+  clearAllBtn.addEventListener('click', () => {
+    if (!confirm('Xoá toàn bộ lịch sử trò chuyện? Hành động này không thể hoàn tác.')) return;
+    sessions = [{ id: uid(), title:'Cuộc trò chuyện mới', titleSet:false, model: currentModel, createdAt: Date.now(), messages: [] }];
+    currentSessionId = sessions[0].id;
+    saveSessions();
+    renderChatsList();
+    renderAccountStats();
+  });
+
+  /* ---------------- Download Source HTML ---------------- */
+  function downloadSourceHTML() {
+    try {
+      const cloneDoc = document.documentElement.cloneNode(true);
+      const modelSwitchOpen = cloneDoc.querySelector('#modelSwitchPanel'); if (modelSwitchOpen) modelSwitchOpen.classList.remove('open');
+      const modelBadgeOpen = cloneDoc.querySelector('#modelBadge'); if (modelBadgeOpen) modelBadgeOpen.classList.remove('open');
+      const attachMenuOpen = cloneDoc.querySelector('#attachMenu'); if (attachMenuOpen) attachMenuOpen.classList.remove('open');
+      const attachBtnOpen = cloneDoc.querySelector('#attachBtn'); if (attachBtnOpen) attachBtnOpen.classList.remove('open');
+      const htmlContent = '<!DOCTYPE html>\n' + cloneDoc.outerHTML;
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'gemini_chat_app.html';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addSystemMsg('📥 Mã nguồn HTML của Web Chat đã được tải xuống máy tính của bạn thành công!');
+    } catch(e) {
+      alert('Lỗi khi tải mã nguồn xuống: ' + e.message);
+    }
+  }
+  downloadSourceBtn.addEventListener('click', downloadSourceHTML);
+
+  /* ---------------- Events ---------------- */
+  sendBtn.addEventListener('click', handleSend);
+  userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
+  userInput.addEventListener('input', updateSendState);
+  setKeyBtn.addEventListener('click', () => {
+    const key = apiKeyInput.value.trim();
+    if (!key) { alert('Key không được để trống.'); return; }
+    API_KEY = key; localStorage.setItem('gemini_key', key);
+    updateChatEnable();
+    setKeyBtn.textContent = 'Đã lưu ✓';
+    setTimeout(() => setKeyBtn.textContent = 'Lưu', 1500);
+  });
+  apiKeyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') setKeyBtn.click(); });
+  saveBtn.addEventListener('click', saveAllSettings);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeModelSwitch(); closeAttachMenu(); if (chatViewScreen.classList.contains('active')) closeChatView(); }
+  });
+
+  /* ---------------- PWA install ---------------- */
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installPwaSub.textContent = 'Mở như một ứng dụng thật';
+  });
+  installPwaBtn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installPwaSub.textContent = choice.outcome === 'accepted' ? 'Đã cài đặt ✓' : 'Mở như một ứng dụng thật';
+    } else {
+      alert('Nếu trình duyệt chưa hiện lời nhắc cài đặt, hãy dùng menu trình duyệt (⋮ hoặc Chia sẻ) → "Thêm vào Màn hình chính".');
+    }
+  });
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+    installPwaSub.textContent = 'Đã chạy ở chế độ ứng dụng';
+  }
+
+  /* ---------------- Mobile keyboard / viewport fix ---------------- */
+  function setAppHeight(){
+    const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--app-height', h + 'px');
+  }
+  setAppHeight();
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', setAppHeight);
+    window.visualViewport.addEventListener('scroll', setAppHeight);
+  }
+  window.addEventListener('resize', setAppHeight);
+  window.addEventListener('orientationchange', () => setTimeout(setAppHeight, 200));
+  userInput.addEventListener('focus', () => {
+    setTimeout(() => { setAppHeight(); msgContainer.scrollTop = msgContainer.scrollHeight; }, 300);
+  });
+
+  /* ---------------- Init ---------------- */
+  sessions = loadSessions();
+  if (sessions.length === 0) {
+    sessions.push({ id: uid(), title:'Cuộc trò chuyện mới', titleSet:false, model: currentModel, createdAt: Date.now(), messages: [] });
+  }
+  const savedCurrent = localStorage.getItem('gemini_current_session');
+  currentSessionId = sessions.find(s => s.id === savedCurrent) ? savedCurrent : sessions[0].id;
+
+  renderChatsList();
+  renderMessages();
+  updateHeader();
+  updateChatEnable();
+  renderAccountStats();
+  showTab('chats');
+})();
+</script>
+</body>
+</html>
