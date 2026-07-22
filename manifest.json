@@ -1,0 +1,18 @@
+{
+  "name": "Gemini Chat",
+  "short_name": "Gemini Chat",
+  "description": "Trợ lý AI Gemini — trò chuyện, gửi ảnh/video/tệp, tuỳ chỉnh model.",
+  "start_url": "./Geminivipzz.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070a12",
+  "theme_color": "#0b3d5c",
+  "lang": "vi",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
