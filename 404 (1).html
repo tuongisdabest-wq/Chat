@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <title>KTuongFX</title>
+    <!-- Kỹ thuật SPA fallback cho GitHub Pages (dựa theo rafgraph/spa-github-pages).
+         Khi người dùng bấm F5 hoặc mở thẳng 1 link như /phim/ten-cau-la-gi, GitHub Pages
+         không tìm thấy file thật ở đường dẫn đó nên trả về trang 404 này. Script bên dưới
+         sẽ "mã hóa" lại đường dẫn rồi chuyển hướng về index.html, sau đó đoạn script đã
+         thêm trong <head> của index.html sẽ giải mã và khôi phục đúng URL ban đầu. -->
+    <script>
+      // Nếu web nằm trong thư mục con dạng username.github.io/ten-repo/ (project page),
+      // đổi số 1 thành số phù hợp (số lượng segment đầu của đường dẫn cần giữ nguyên).
+      // Mặc định 0 dùng cho web chạy ở domain gốc (username.github.io).
+      var pathSegmentsToKeep = 1;
+      var l = window.location;
+      l.replace(
+        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.hash
+      );
+    </script>
+  </head>
+  <body></body>
+</html>
